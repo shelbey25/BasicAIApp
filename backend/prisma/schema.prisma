@@ -1,0 +1,260 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Types Enum
+enum UserType {
+  STUDENT
+  COLLEGE
+}
+
+// Application Status Enum
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  WAITLISTED
+}
+
+// Interview Status Enum
+enum InterviewStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+// Base User Model
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  userType  UserType
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  student Student?
+  college College?
+
+  @@map("users")
+}
+
+// Student Profile
+model Student {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Personal Information
+  firstName    String
+  lastName     String
+  dateOfBirth  DateTime?
+  phoneNumber  String?
+  address      String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String?
+
+  // Academic Information
+  highSchool   String?
+  gpa          Float?
+  satScore     Int?
+  actScore     Int?
+  graduationYear Int?
+
+  // Profile Data
+  bio          String?
+  interests    String[] // Array of interests
+  achievements String[] // Array of achievements
+  
+  // AI-Generated Data
+  archetypeProfile Json? // AI-generated personality profile
+  profileSummary   String? // AI-generated summary
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  interviews    Interview[]
+  applications  Application[]
+
+  @@map("students")
+}
+
+// College Profile
+model College {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Institution Information
+  name            String
+  description     String?
+  website         String?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String?
+  
+  // Admission Information
+  acceptanceRate  Float?
+  averageGPA      Float?
+  averageSAT      Int?
+  averageACT      Int?
+  tuition         Int?
+  
+  // Requirements
+  requirements    Json? // Structured requirements data
+  deadlines       Json? // Application deadlines
+  
+  // Branding
+  logoUrl         String?
+  bannerUrl       String?
+  colors          Json? // Brand colors
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  applications Application[]
+
+  @@map("colleges")
+}
+
+// Interview System (4-part structure)
+model Interview {
+  id        String          @id @default(cuid())
+  studentId String
+  student   Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Interview Metadata
+  status       InterviewStatus @default(NOT_STARTED)
+  retellCallId String?         // Retell conversation ID
+  totalDuration Int?           // Total duration in seconds
+  
+  // Interview Parts (4 parts)
+  part1Completed Boolean @default(false)
+  part2Completed Boolean @default(false)
+  part3Completed Boolean @default(false)
+  part4Completed Boolean @default(false)
+  
+  // Transcriptions and Analysis
+  part1Transcript String?
+  part2Transcript String?
+  part3Transcript String?
+  part4Transcript String?
+  
+  part1Analysis Json? // AI analysis of responses
+  part2Analysis Json?
+  part3Analysis Json?
+  part4Analysis Json?
+  
+  // Overall Analysis
+  overallAnalysis Json? // Combined analysis from all parts
+  strengths       String[] // Identified strengths
+  improvements    String[] // Areas for improvement
+  
+  // Timestamps
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("interviews")
+}
+
+// Application Model
+model Application {
+  id        String            @id @default(cuid())
+  studentId String
+  collegeId String
+  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  college   College           @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  // Application Content
+  personalStatement String?
+  essays           Json? // Array of essay objects
+  activities       Json? // Extracurricular activities
+  awards           Json? // Awards and honors
+  
+  // Generated Content
+  aiGeneratedContent Json? // AI-enhanced content
+  pdfUrl            String? // Generated PDF URL
+  
+  // Application Status
+  status           ApplicationStatus @default(DRAFT)
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  decisionAt       DateTime?
+  
+  // College Response
+  decisionNotes    String? // College's decision notes
+  feedbackNotes    String? // Feedback for student
+  
+  // Metadata
+  version          Int     @default(1) // For tracking edits
+  lastEditedBy     String? // 'student' or 'ai'
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  revisions ApplicationRevision[]
+
+  @@unique([studentId, collegeId]) // One application per student per college
+  @@map("applications")
+}
+
+// Application Revision History
+model ApplicationRevision {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Revision Data
+  content       Json // Snapshot of application content
+  changes       Json // What was changed
+  editedBy      String // 'student' or 'ai'
+  editReason    String? // Reason for edit
+  
+  createdAt DateTime @default(now())
+
+  @@map("application_revisions")
+}
+
+// System Configuration
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+// Analytics and Metrics
+model Analytics {
+  id     String   @id @default(cuid())
+  event  String   // Event name (e.g., 'interview_completed', 'application_submitted')
+  data   Json     // Event data
+  userId String?  // Associated user ID
+  
+  createdAt DateTime @default(now())
+
+  @@map("analytics")
+}
